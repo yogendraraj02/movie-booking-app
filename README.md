@@ -1,2 +1,1 @@
-redis-server to start redis
-
+Movie Booking Application - Nodejs
