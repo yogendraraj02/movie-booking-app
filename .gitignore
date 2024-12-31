@@ -1,0 +1,11 @@
+node_modules
+bin
+bin1
+client
+dist
+dump.rdb
+env.copy
+.env
+main.md
+main-execu.md
+__MACOSX
