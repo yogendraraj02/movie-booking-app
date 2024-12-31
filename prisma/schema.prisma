@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+model City {
+  id        Int        @id @default(autoincrement())
+  name      String
+  state     String
+  theatres  Theatre[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([name])
+}
+
+
+model Theatre {
+  id          Int               @id @default(autoincrement())
+  name        String
+  address     String
+  cityId      Int
+  city        City              @relation(fields: [cityId], references: [id])
+  screens     Screen[]
+  amenities   TheatreAmenity[]  // Relation to amenities
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([cityId])
+}
+
+model Amenity {
+  id          Int               @id @default(autoincrement())
+  name        String            @unique  // e.g., "Parking", "Food Court"
+  theatres    TheatreAmenity[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model TheatreAmenity {
+  theatreId   Int
+  amenityId   Int
+  theatre     Theatre   @relation(fields: [theatreId], references: [id])
+  amenity     Amenity   @relation(fields: [amenityId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@id([theatreId, amenityId])
+  @@index([theatreId])
+  @@index([amenityId])
+}
+
+model Screen {
+  id              Int               @id @default(autoincrement())
+  name            String            // Example: "AUDI 1"
+  theatreId       Int
+  theatre         Theatre           @relation(fields: [theatreId], references: [id])
+  capacity        Int
+  screenType      String            // STANDARD, IMAX, 4DX
+  shows           Show[]
+  seatCategories  SeatCategory[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([theatreId])
+}
+
+model SeatCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    // SILVER, GOLD, PLATINUM
+  screenId    Int
+  screen      Screen    @relation(fields: [screenId], references: [id])
+  basePrice   Decimal   @db.Decimal(10, 2)
+  seats       Seat[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([screenId])
+}
+
+model Seat {
+  id              Int           @id @default(autoincrement())
+  seatNumber      String        // Example: "A1"
+  row             String        // Example: "A"
+  categoryId      Int
+  category        SeatCategory  @relation(fields: [categoryId], references: [id])
+  bookings        Booking[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([seatNumber, categoryId])
+  @@index([categoryId])
+}
+
+
+model Movie {
+  id              Int           @id @default(autoincrement())
+  title           String
+  description     String        @db.Text
+  duration        Int
+  language        String
+  rating          Float?
+  releaseDate     DateTime
+  endDate         DateTime?
+  posterUrl       String?
+  shows           Show[]
+  genres          MovieGenre[] // Relation to genres
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([releaseDate])
+}
+
+model Genre {
+  id        Int           @id @default(autoincrement())
+  name      String        @unique
+  movies    MovieGenre[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model MovieGenre {
+  movieId   Int
+  genreId   Int
+  movie     Movie     @relation(fields: [movieId], references: [id])
+  genre     Genre     @relation(fields: [genreId], references: [id])
+  createdAt DateTime  @default(now())
+
+  @@id([movieId, genreId])
+  @@index([movieId])
+  @@index([genreId])
+}
+
+model Show {
+  id          Int           @id @default(autoincrement())
+  movieId     Int
+  movie       Movie         @relation(fields: [movieId], references: [id])
+  screenId    Int
+  screen      Screen        @relation(fields: [screenId], references: [id])
+  startTime   DateTime
+  endTime     DateTime
+  bookings    Booking[]
+  seatLocks   SeatLock[]    // For temporary seat holds
+  status      ShowStatus    @default(SCHEDULED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([movieId])
+  @@index([screenId])
+  @@index([startTime])
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  showId        Int
+  show          Show          @relation(fields: [showId], references: [id])
+  userId        Int
+  user          User          @relation(fields: [userId], references: [id])
+  seats         Seat[]
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  status        BookingStatus @default(PENDING)
+  paymentId     String?       // Reference to payment gateway transaction
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([showId])
+  @@index([userId])
+}
+
+model SeatLock {
+  id            Int       @id @default(autoincrement())
+  showId        Int
+  show          Show      @relation(fields: [showId], references: [id])
+  seatId        Int
+  lockExpiresAt DateTime
+  sessionId     String    // To identify which user/session locked the seat
+  createdAt     DateTime  @default(now())
+
+  @@unique([showId, seatId]) // Prevent multiple locks on same seat
+  @@index([lockExpiresAt])   // For cleanup of expired locks
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String?
+  name      String
+  phone     String?
+  bookings  Booking[]
+  role      UserRole  @default(CUSTOMER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+
+enum UserRole {
+  ADMIN
+  THEATRE_ADMIN
+  CUSTOMER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ShowStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
